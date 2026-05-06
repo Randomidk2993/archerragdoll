@@ -359,7 +359,7 @@ unityLoader.onload = () => {
     setInterval(() => {
       const saved = loadGameData() || {};
       saveGameData({ ...saved, _autoSave: true });
-    }, 60000);
+    }, 30000);
 
   }).catch((message) => {
     tipEl.textContent = 'Failed to load game. Please refresh.';
