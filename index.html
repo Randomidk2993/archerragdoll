@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ragdoll Archers</title>
+<script src="https://cdn.jsdelivr.net/gh/laparda14/Ragdoll-archers@62504c9570ea720c6367e7debe1e110c68f77c2d/vs/gameloader-helper.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0d0d0d;
+    --panel:    #141414;
+    --accent:   #e8421a;
+    --accent2:  #f7a325;
+    --text:     #f0ece4;
+    --muted:    #6b6560;
+    --radius:   6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: 'Barlow', sans-serif;
+    color: var(--text);
+  }
+
+  /* ── GAME CANVAS ── */
+  #unity-container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  #unity-container.ready { opacity: 1; }
+
+  #unity-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* ── LOADING SCREEN ── */
+  #loading-cover {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    z-index: 100;
+    transition: opacity 0.5s ease;
+  }
+  #loading-cover.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Arrow rain background animation */
+  #loading-cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        160deg,
+        transparent 0px,
+        transparent 60px,
+        rgba(232,66,26,0.04) 60px,
+        rgba(232,66,26,0.04) 61px
+      );
+    animation: drift 8s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes drift {
+    from { background-position: 0 0; }
+    to   { background-position: 100px 200px; }
+  }
+
+  .loader-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(48px, 8vw, 96px);
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-align: center;
+    position: relative;
+  }
+  .loader-title span {
+    color: var(--accent);
+  }
+  .loader-title::after {
+    content: '🏹';
+    display: block;
+    font-size: 0.45em;
+    margin-top: 8px;
+    animation: bob 2s ease-in-out infinite;
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-8px); }
+  }
+
+  .loader-bar-wrap {
+    width: min(380px, 80vw);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .loader-bar-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 99px;
+    overflow: hidden;
+    position: relative;
+  }
+  #unity-progress-bar-full {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    transition: width 0.3s ease;
+    position: relative;
+  }
+  #unity-progress-bar-full::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 24px;
+    background: rgba(255,255,255,0.35);
+    filter: blur(4px);
+    border-radius: 99px;
+  }
+
+  .loader-pct {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+  }
+
+  .loader-tip {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.5;
+    animation: fadeTip 0.5s ease;
+  }
+  @keyframes fadeTip {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SAVE BADGE ── */
+  #save-badge {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(20,20,20,0.92);
+    border: 1px solid rgba(232,66,26,0.3);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.4s, transform 0.4s;
+    pointer-events: none;
+    backdrop-filter: blur(6px);
+  }
+  #save-badge.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  #save-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 1.5s ease infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.7); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Game canvas -->
+<div id="unity-container" class="unity-desktop">
+  <canvas id="unity-canvas"></canvas>
+</div>
+
+<!-- Loading screen -->
+<div id="loading-cover">
+  <div class="loader-title">Ragdoll<br><span>Archers</span></div>
+  <div class="loader-bar-wrap">
+    <div class="loader-bar-track">
+      <div id="unity-progress-bar-full"></div>
+    </div>
+    <div class="loader-pct" id="loader-pct-text">0%</div>
+  </div>
+  <div class="loader-tip" id="loader-tip">Loading game assets…</div>
+</div>
+
+<!-- Save toast -->
+<div id="save-badge">
+  <span class="dot"></span>
+  <span id="save-badge-text">Progress saved</span>
+</div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SAVE SYSTEM (localStorage)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SAVE_KEY = 'ragdoll_archers_save';
+
+function saveGameData(data) {
+  try {
+    const payload = { ...data, _savedAt: Date.now() };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    showSaveBadge('Progress saved');
+    console.log('[Save] Saved:', payload);
+  } catch(e) {
+    console.warn('[Save] Could not save:', e);
+  }
+}
+
+function loadGameData() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    console.log('[Save] Loaded:', data);
+    return data;
+  } catch(e) {
+    console.warn('[Save] Could not load:', e);
+    return null;
+  }
+}
+
+function clearGameData() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    showSaveBadge('Save cleared');
+    console.log('[Save] Cleared.');
+  } catch(e) {}
+}
+
+// ── Save toast notification ──
+let badgeTimer = null;
+function showSaveBadge(msg) {
+  const badge = document.getElementById('save-badge');
+  const text  = document.getElementById('save-badge-text');
+  text.textContent = msg || 'Progress saved';
+  badge.classList.add('show');
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => badge.classList.remove('show'), 2500);
+}
+
+// ── Expose to Unity via SendMessage ──
+// Unity can call: gameInstance.SendMessage('SaveManager', 'ReceiveSave', jsonString)
+// Or you can call these directly from JS:
+window.RagdollSave = { save: saveGameData, load: loadGameData, clear: clearGameData };
+
+// ── Ask browser to persist storage ──
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(granted => {
+    console.log('[Save] Persistent storage:', granted ? 'granted' : 'denied');
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  LOADING TIPS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const tips = [
+  'Aim for the head for bonus damage.',
+  'Your ragdoll physics are fully simulated.',
+  'Upgrade your bow to shoot faster.',
+  'Watch out — enemies dodge too!',
+  'Chain kills for score multipliers.',
+];
+let tipIdx = 0;
+const tipEl = document.getElementById('loader-tip');
+const tipInterval = setInterval(() => {
+  tipIdx = (tipIdx + 1) % tips.length;
+  tipEl.style.animation = 'none';
+  void tipEl.offsetWidth; // reflow
+  tipEl.style.animation = 'fadeTip 0.5s ease';
+  tipEl.textContent = tips[tipIdx];
+}, 3000);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  UNITY LOADER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const loaderUrl = "https://cdn.jsdelivr.net/gh/bubbls/ruffle@7117cc5006472d782b65d96abd375597d6273242/v11121212.js";
+const config = {
+  dataUrl:            "https://cdn.jsdelivr.net/gh/bubbls/ruffle@04dd5345a30d6ebf4b0e2cc385568750cd56ed5a/6697b6deba8b617c67b69c55dcd07cb1.data.unityweb",
+  frameworkUrl:       "https://cdn.jsdelivr.net/gh/bubbls/ruffle@04dd5345a30d6ebf4b0e2cc385568750cd56ed5a/0be3c3ee7115b26e1ae28e643afdf1f2.js.unityweb",
+  codeUrl:            "https://cdn.jsdelivr.net/gh/bubbls/ruffle@04dd5345a30d6ebf4b0e2cc385568750cd56ed5a/b3397c29f6878557c1c614cbf9e196ea.wasm.unityweb",
+  streamingAssetsUrl: "StreamingAssets",
+  companyName:        "Ericetto",
+  productName:        "Ragdoll Archers",
+  productVersion:     "0.1",
+};
+
+const container       = document.getElementById('unity-container');
+const canvas          = document.getElementById('unity-canvas');
+const loadingCover    = document.getElementById('loading-cover');
+const progressBarFull = document.getElementById('unity-progress-bar-full');
+const pctText         = document.getElementById('loader-pct-text');
+
+const unityLoader = document.createElement('script');
+unityLoader.src = loaderUrl;
+unityLoader.onload = () => {
+  createUnityInstance(canvas, config, (progress) => {
+    const pct = Math.round(progress * 100);
+    progressBarFull.style.width = pct + '%';
+    pctText.textContent = pct + '%';
+  }).then((unityInstance) => {
+    window.unityInstance = unityInstance;
+
+    // Hide loading screen
+    clearInterval(tipInterval);
+    loadingCover.classList.add('hidden');
+    setTimeout(() => {
+      loadingCover.style.display = 'none';
+      container.classList.add('ready');
+    }, 500);
+
+    // Load existing save and pass to Unity if supported
+    const saved = loadGameData();
+    if (saved) {
+      console.log('[Save] Found existing save, passing to Unity:', saved);
+      // Uncomment when your Unity game has a SaveManager:
+      // unityInstance.SendMessage('SaveManager', 'LoadGame', JSON.stringify(saved));
+    }
+
+    // Auto-save every 60 seconds as a safety net
+    setInterval(() => {
+      const saved = loadGameData() || {};
+      saveGameData({ ...saved, _autoSave: true });
+    }, 60000);
+
+  }).catch((message) => {
+    tipEl.textContent = 'Failed to load game. Please refresh.';
+    console.error('[Unity] Load error:', message);
+  });
+};
+document.body.appendChild(unityLoader);
+
+// Focus fix for keyboard input
+document.addEventListener('pointerdown', () => canvas.focus());
+</script>
+</body>
+</html>
